@@ -1,1 +1,44 @@
+name: Build APK
 
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Mendukung dua cara unggah: zip utuh (CineGrade.zip) atau folder yang sudah diekstrak
+      - name: Siapkan folder proyek
+        run: |
+          if [ -f CineGrade.zip ]; then unzip -oq CineGrade.zip; fi
+          if [ -f settings.gradle.kts ]; then
+            echo "PROJ=." >> "$GITHUB_ENV"
+          else
+            echo "PROJ=CineGrade" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Uji unit (tidak menghentikan build bila gagal)
+        working-directory: ${{ env.PROJ }}
+        continue-on-error: true
+        run: gradle testDebugUnitTest --no-daemon --stacktrace
+
+      - name: Build APK debug
+        working-directory: ${{ env.PROJ }}
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CineGrade-debug-apk
+          path: ${{ env.PROJ }}/app/build/outputs/apk/debug/*.apk
